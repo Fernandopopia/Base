@@ -80,19 +80,19 @@ const byte version = 23;         // firmware version divided by 10 e,g 16 = V1.6
 
 //----------------------------emonTx V3 Settings---------------------------------------------------------------------------------------------------------------
 const byte Vrms=                  127;                               // Vrms for apparent power readings (when no AC-AC voltage sample is present)
-const byte TIME_BETWEEN_READINGS = 10;            //Time between readings   
+const byte TIME_BETWEEN_READINGS = 10;                               //Time between readings   
 
 //http://openenergymonitor.org/emon/buildingblocks/calibration
 
-const float Ical1=                90.9;                               // (2000 turns / 22 Ohm burden) = 90.9
-const float Ical2=                90.9;                               // (2000 turns / 22 Ohm burden) = 90.9
-const float Ical3=                90.9;                               // (2000 turns / 22 Ohm burden) = 90.9
-const float Ical4=                16.67;                              // (2000 turns / 120 Ohm burden) = 16.67
+const float Ical1=                94.54;                               // (2000 turns / 22 Ohm burden) = 90.9 (x1,04)
+const float Ical2=                94.54;                               // (2000 turns / 22 Ohm burden) = 90.9 (x1,04)
+const float Ical3=                94.54;                               // (2000 turns / 22 Ohm burden) = 90.9
+const float Ical4=                17.34;                              // (2000 turns / 120 Ohm burden) = 16.67
 
 float Vcal=                       268.97;                             // (230V x 13) / (9V x 1.2) = 276.9 Calibration for UK AC-AC adapter 77DB-06-09 
 //float Vcal=276.9;
 //const float Vcal=               260;                                //Calibration for EU AC-AC adapter 77DE-06-09 
-const float Vcal_USA=             164.7;                              //Calibration for US AC-AC adapter 77DA-10-09 - original 130
+const float Vcal_USA=             159.61;                             //Calibration for US AC-AC adapter 77DA-10-09 - original 130  Calibration - Measure Multimeter x Module  129,1 x 12,23 / 10,21
 boolean USA=FALSE; 
 
 const float phase_shift=          1.7;
@@ -157,40 +157,6 @@ char prefixChar = 's';   // Starting Character before sending any data across th
 char suffixChar = 'e';   // Ending character after all the data is sent
 int maxLoopsToWait = -1; //Set to -1 for size of current Object and wrapper
 
-void sendObject(Stream &ostream, void* ptr, unsigned int objSize) {
-  if(MAX_SIZE >= objSize+sizeof(char)*2) { //make sure the object isn't too large
-    ostream.write((byte)prefixChar); // Write the suffix character to signify the start of a stream
-    ostream.write(44);
-    if (CT1){
-      ostream.write(emontx.power1 >> 8); //Value high
-      ostream.write(emontx.power1 & 0xFF); //Value low
-      ostream.write(44); //Divider     
-    }
-    if (CT2){
-      ostream.write(emontx.power2 >> 8); //Value high
-      ostream.write(emontx.power2 & 0xFF); //Value low
-      ostream.write(44); //Divider     
-    }
-    if (CT3){
-      ostream.write(emontx.power3 >> 8); //Value high
-      ostream.write(emontx.power3 & 0xFF); //Value low
-      ostream.write(44); //Divider     
-    }
-    if (CT4){
-      ostream.write(emontx.power4 >> 8); //Value high
-      ostream.write(emontx.power4 & 0xFF); //Value low
-      ostream.write(44); //Divider     
-    }
-    if (ACAC){
-      ostream.write(emontx.Vrms >> 8); //Value high
-      ostream.write(emontx.Vrms & 0xFF); //Value low
-      ostream.write(44); //Divider     
-    }
-    ostream.write((byte)suffixChar); // Write the prefix character to signify the end of a stream
-  }
-}
-
-
 //-------------------------------------------------------------------------------------------------------------------------------------------
        
 void setup()
@@ -209,12 +175,9 @@ void setup()
   ET.begin(details(emontx), &mySerial);
    
   Serial.print("emonTx V3.4 Discrete Sampling V"); Serial.print(version*0.1);
-  #if (RF69_COMPAT)
-    Serial.println(" RFM69CW");
-  #else
-    Serial.println(" RFM12B");
-  #endif
-  Serial.println("OpenEnergyMonitor.org");
+
+  Serial.println("Using ESP8266");
+  Serial.println("Senergy.com.br");
   Serial.println("POST.....wait 10s");
   
   //READ DIP SWITCH POSITIONS 
@@ -229,14 +192,6 @@ void setup()
   } 
   
   delay(10);
-  //rf12_initialize(nodeID, RF_freq, networkGroup);                         // initialize RFM12B/rfm69CW
-  //for (int i=10; i>=0; i--)                                               // Send RF test sequence (for factory testing)
-  //{
-  //  emontx.power1=i; 
-  //  rf12_sendNow(0, &emontx, sizeof emontx);
-  //  delay(100);
-  //}
-  //rf12_sendWait(2);
   emontx.power1=0;
   
   if (analogRead(1) > 0) {CT1 = 1; CT_count++;} else CT1=0;              // check to see if CT is connected to CT1 input, if so enable that channel
@@ -333,19 +288,6 @@ void setup()
     } else { 
       Serial.println("No temperature sensor");
     }
-    
-    #if (RF69_COMPAT)
-       Serial.println("RFM69CW");
-    #else
-      Serial.println("RFM12B");
-    #endif
-    
-    Serial.print("Node: "); Serial.print(nodeID); 
-    Serial.print(" Freq: "); 
-    if (RF_freq == RF12_433MHZ) Serial.print("433Mhz");
-    if (RF_freq == RF12_868MHZ) Serial.print("868Mhz");
-    if (RF_freq == RF12_915MHZ) Serial.print("915Mhz"); 
-    Serial.print(" Network: "); Serial.println(networkGroup);
 
     Serial.print("CT1 CT2 CT3 CT4 VRMS/BATT PULSE");
     if (DS18B20_STATUS==1){Serial.print(" Temperature 1-"); Serial.print(numSensors);}
@@ -387,11 +329,6 @@ void loop()
     delay(200);                         //if powering from AC-AC allow time for power supply to settle    
     emontx.Vrms=0;                      //Set Vrms to zero, this will be overwirtten by CT 1-4
   }
-  
-  // emontx.power1 = 1;
-  // emontx.power2 = 1;
-  // emontx.power3 = 1;
-  // emontx.power4 = 1;
   
   if (CT1) {
     if (ACAC) {
@@ -474,12 +411,10 @@ void loop()
   
   if (ACAC) {digitalWrite(LEDpin, HIGH); delay(200); digitalWrite(LEDpin, LOW);}    // flash LED if powered by AC
   
-  //send_rf_data();                                                           // *SEND RF DATA* - see emontx_lib
-  //mySerial.write(emontx.Vrms >> 8);
-  //mySerial.write(emontx.Vrms & 0xFF);
   ET.sendData();
-  Serial.println(sizeof(emontx));
-  //sendObject(mySerial, &emontx, sizeof emontx);
+  if (debug==1){
+    Serial.println(sizeof(emontx));
+  }
   
   unsigned long runtime = millis() - start;
   unsigned long sleeptime = (TIME_BETWEEN_READINGS*1000) - runtime - 100;
@@ -491,15 +426,6 @@ void loop()
     Sleepy::loseSomeTime(sleeptime-500);                                    // sleep or delay in seconds 
   }
 }
-
-//void send_rf_data()
-//{
-//  rf12_sleep(RF12_WAKEUP);                                   
-//  rf12_sendNow(0, &emontx, sizeof emontx);                           //send temperature data via RFM12B using new rf12_sendNow wrapper
-//  rf12_sendWait(2);
-//  if (!ACAC) rf12_sleep(RF12_SLEEP);                             //if powred by battery then put the RF module into sleep inbetween readings 
-//}
-
 
 double calc_rms(int pin, int samples)
 {
